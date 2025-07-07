@@ -1,0 +1,114 @@
+
+#!/bin/bash
+
+# Convert Lottie JSON animation files to .lottie binary format
+# 
+# This script creates a .lottie file (which is a ZIP archive) containing:
+# - animations/data.json: The Lottie animation data
+# - manifest.json: Metadata describing the animation
+#
+# The structure matches the format expected by @lottiefiles/dotlottie-react
+# and other DotLottie libraries.
+#
+# Usage: json2lottie input.json output.lottie
+
+set -e
+
+show_help() {
+  cat << EOF
+json2lottie - Convert Lottie JSON files to .lottie binary format
+
+USAGE:
+  json2lottie <input.json> <output.lottie>
+  json2lottie --help
+
+EXAMPLES:
+  json2lottie animation.json my-animation.lottie
+  json2lottie ./assets/loader.json ./dist/loader.lottie
+
+OUTPUT:
+  Creates a .lottie file (ZIP archive) containing:
+  - animations/data.json: Your Lottie animation data
+  - manifest.json: Metadata for DotLottie format
+
+REQUIREMENTS:
+  - zip command (usually pre-installed)
+  - Valid JSON input file
+EOF
+}
+
+if [ "$#" -eq 1 ] && [ "$1" = "--help" ]; then
+  show_help
+  exit 0
+fi
+
+if [ "$#" -ne 2 ]; then
+  echo "❌ Error: Invalid number of arguments"
+  echo ""
+  echo "Usage: json2lottie <input.json> <output.lottie>"
+  echo "Try: json2lottie --help"
+  exit 1
+fi
+
+JSON_PATH="$1"
+LOTTIE_PATH="$2"
+
+if [ ! -f "$JSON_PATH" ]; then
+  echo "❌ Error: Input JSON file not found"
+  echo "   File: $JSON_PATH"
+  echo "   Please check the file path and try again."
+  exit 2
+fi
+
+if ! command -v zip >/dev/null 2>&1; then
+  echo "❌ Error: 'zip' command not found"
+  echo "   Please install zip:"
+  echo "   • macOS: brew install zip"
+  echo "   • Ubuntu/Debian: sudo apt install zip"
+  echo "   • CentOS/RHEL: sudo yum install zip"
+  exit 3
+fi
+
+# Validate output directory
+OUTPUT_DIR="$(dirname "$LOTTIE_PATH")"
+if [ ! -d "$OUTPUT_DIR" ]; then
+  echo "❌ Error: Output directory does not exist"
+  echo "   Directory: $OUTPUT_DIR"
+  echo "   Please create the directory first."
+  exit 4
+fi
+
+TMPDIR=$(mktemp -d)
+if [ $? -ne 0 ]; then
+  echo "❌ Error: Failed to create temporary directory"
+  exit 5
+fi
+
+# Create animations subdirectory and copy JSON there
+mkdir -p "$TMPDIR/animations"
+cp "$JSON_PATH" "$TMPDIR/animations/data.json"
+
+cat > "$TMPDIR/manifest.json" <<EOF
+{"version":"1","generator":"@dotlottie/dotlottie-js@0.9.0-beta.13","author":"LottieFiles","animations":[{"id":"data"}]}
+EOF
+
+# always create the zip in the temp dir
+cd "$TMPDIR"
+zip -r animation.lottie animations/data.json manifest.json > /dev/null
+
+# move the .lottie file to the path the user specified, absolute or relative to where they called the script
+mv animation.lottie "$OLDPWD/$LOTTIE_PATH"
+
+cd "$OLDPWD"
+rm -rf "$TMPDIR"
+
+# Get file size
+FILE_SIZE=$(stat -f%z "$LOTTIE_PATH" 2>/dev/null || stat -c%s "$LOTTIE_PATH" 2>/dev/null || echo "unknown")
+
+echo "✅ Successfully created .lottie file"
+echo "   Input:  $JSON_PATH"
+echo "   Output: $LOTTIE_PATH"
+echo "   Size:   ${FILE_SIZE} bytes"
+echo ""
+echo "💡 Your .lottie file is ready to use with DotLottie libraries!"
+
