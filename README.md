@@ -32,6 +32,12 @@ json2lottie ./assets/loader.json ./dist/loader.lottie
 
 # Convert with absolute paths
 json2lottie /path/to/animation.json /path/to/output.lottie
+
+# Bulk convert all JSON files in a directory
+for f in *.json; do json2lottie "$f" "${f%.json}.lottie"; done
+
+# Bulk convert with custom output directory
+mkdir -p output && for f in *.json; do json2lottie "$f" "output/${f%.json}.lottie"; done
 ```
 
 ## Requirements
